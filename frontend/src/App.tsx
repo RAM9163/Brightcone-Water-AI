@@ -10,6 +10,7 @@ import {
   MapPin,
   ShieldCheck,
   Wrench,
+  Map,
   BarChart3,
   RefreshCw,
   CheckCircle2,
@@ -31,17 +32,22 @@ import {
 import "./App.css";
 
 const API = "http://127.0.0.1:8000";
-
 type Page =
   | "Dashboard"
+  | "Network Configuration"
   | "Network Monitoring"
   | "Demand Forecasting"
   | "Anomalies"
+  | "Alert Center"
   | "Leak Detection"
+  | "Pressure & Flow Analytics"
   | "Water Balance"
   | "Maintenance"
+  | "Field Operations"
+  | "AI Operations Center"
   | "Operations"
-  | "Reports";
+  | "Reports"
+  | "Live Network Map";
 
 interface DashboardData {
   system: {
@@ -67,8 +73,10 @@ interface DashboardData {
     top_priority_pipe: string;
     priority_score: number;
   };
+
   operations: {
     recommendations: number;
+    pending_approvals: number;
     human_approval_required: boolean;
     workflow_state: string;
   };
@@ -120,7 +128,7 @@ interface Maintenance {
   pipe_section: string;
   priority: string;
   priority_score: number;
-  field_team: string;
+  assigned_team: string;
   status: string;
   reason: string;
 }
@@ -198,6 +206,7 @@ function App() {
     { name: "Maintenance", icon: <Wrench size={19} /> },
     { name: "Operations", icon: <ShieldCheck size={19} /> },
     { name: "Reports", icon: <BarChart3 size={19} /> },
+    { name: "Live Network Map", icon: <Map size={19} /> },
   ];
 
   return (
@@ -262,21 +271,33 @@ function App() {
           <DashboardPage dashboard={dashboard} setPage={setPage} />
         )}
 
+        {page === "Network Configuration" && <NetworkConfigurationPage />}
+
         {page === "Network Monitoring" && <MonitoringPage />}
 
         {page === "Demand Forecasting" && <Forecasting />}
 
         {page === "Anomalies" && <AnomaliesPage />}
 
+        {page === "Alert Center" && <AlertCenterPage />}
+
         {page === "Leak Detection" && <LeaksPage />}
+
+        {page === "Pressure & Flow Analytics" && <PressureFlowAnalyticsPage />}
 
         {page === "Water Balance" && <WaterBalancePage />}
 
         {page === "Maintenance" && <MaintenancePage />}
 
+        {page === "Field Operations" && <FieldOperationsPage />}
+
+        {page === "AI Operations Center" && <AIOperationsCenterPage />}
+
         {page === "Operations" && <OperationsPage />}
 
         {page === "Reports" && <ReportsPage />}
+
+        {page === "Live Network Map" && <LiveNetworkMapPage />}
 
         <footer>
           <span>Brightcone Water Distribution AI</span>
@@ -287,6 +308,1084 @@ function App() {
         </footer>
       </main>
     </div>
+  );
+}
+
+/* ================= ALERT CENTER ================= */
+
+function AlertCenterPage() {
+  const [alerts, setAlerts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAlerts = async () => {
+      try {
+        const [anomalyResponse, leakResponse] = await Promise.all([
+          axios.get(`${API}/api/anomalies`),
+          axios.get(`${API}/api/leaks`),
+        ]);
+
+        const anomalyData = anomalyResponse.data.data || [];
+        const leakData = leakResponse.data.data || [];
+
+        const anomalyAlerts = anomalyData.map((item: any) => ({
+          dma_id: item.dma_id,
+          timestamp: item.timestamp,
+          type: "Anomaly Detected",
+          severity:
+            item.flow_z_score >= 3 || item.pressure_z_score >= 3
+              ? "High"
+              : "Medium",
+          message: "Abnormal flow or pressure condition detected.",
+          evidence: `Flow z-score: ${Number(item.flow_z_score || 0).toFixed(
+            2,
+          )}, Pressure z-score: ${Number(item.pressure_z_score || 0).toFixed(
+            2,
+          )}`,
+        }));
+
+        const leakAlerts = leakData
+          .filter((item: any) => item.confidence === "High")
+          .map((item: any) => ({
+            dma_id: item.dma_id,
+            timestamp: item.timestamp,
+            type: "Suspected Leak",
+            severity: "High",
+            message:
+              item.hypothesis ||
+              "Multiple sensor indicators suggest a possible leak.",
+            evidence:
+              item.evidence ||
+              "Flow, pressure and nighttime conditions correlated.",
+          }));
+
+        setAlerts([...anomalyAlerts, ...leakAlerts]);
+      } catch (error) {
+        console.error("Failed to load alerts:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAlerts();
+  }, []);
+
+  const highAlerts = alerts.filter((alert) => alert.severity === "High").length;
+
+  const leakAlerts = alerts.filter(
+    (alert) => alert.type === "Suspected Leak",
+  ).length;
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <h1>Alert Center</h1>
+          <p>
+            Centralized view of detected anomalies and suspected leak events
+          </p>
+        </div>
+      </section>
+
+      <section className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <AlertTriangle />
+          </div>
+          <div>
+            <span>Total Alerts</span>
+            <strong>{alerts.length}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon red">
+            <AlertTriangle />
+          </div>
+          <div>
+            <span>High Severity</span>
+            <strong>{highAlerts}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <Droplets />
+          </div>
+          <div>
+            <span>Suspected Leaks</span>
+            <strong>{leakAlerts}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Active AI Alerts</h2>
+            <p>
+              Alerts generated from flow, pressure and leak-detection analysis
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Loading alerts...</p>
+        ) : alerts.length === 0 ? (
+          <p>No active alerts detected.</p>
+        ) : (
+          <div className="alert-list">
+            {alerts.map((alert, index) => (
+              <div className="alert-card" key={`${alert.dma_id}-${index}`}>
+                <div>
+                  <strong>
+                    {alert.type} — {alert.dma_id}
+                  </strong>
+
+                  <p>{alert.message}</p>
+
+                  <small>
+                    {alert.timestamp} · {alert.evidence}
+                  </small>
+                </div>
+
+                <span
+                  className={
+                    alert.severity === "High"
+                      ? "status-badge critical"
+                      : "status-badge warning"
+                  }
+                >
+                  {alert.severity}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>AI Alert Interpretation</h2>
+            <p>
+              Alerts are decision-support signals and require operator
+              validation before field action.
+            </p>
+          </div>
+        </div>
+
+        <div className="approval-box">
+          <div className="approval-icon">
+            <ShieldCheck size={25} />
+          </div>
+
+          <div>
+            <strong>Human Validation Required</strong>
+            <p>
+              AI-generated alerts do not directly control pumps, valves or other
+              physical infrastructure.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ================= NETWORK CONFIGURATION ================= */
+
+function NetworkConfigurationPage() {
+  const [network, setNetwork] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadNetwork = async () => {
+      try {
+        const response = await axios.get(`${API}/api/network`);
+        setNetwork(response.data.data || []);
+      } catch (error) {
+        console.error("Failed to load network configuration:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadNetwork();
+  }, []);
+
+  const totalDMAs = new Set(network.map((item) => item.dma_id)).size;
+  const totalPipes = network.length;
+  const highCriticality = network.filter(
+    (item) => item.criticality === "High",
+  ).length;
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <h1>Network Configuration</h1>
+          <p>
+            Water-network assets, distribution zones and pipeline configuration
+          </p>
+        </div>
+      </section>
+
+      <section className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <Gauge />
+          </div>
+          <div>
+            <span>Distribution Zones</span>
+            <strong>{totalDMAs}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <MapPin />
+          </div>
+          <div>
+            <span>Pipeline Sections</span>
+            <strong>{totalPipes}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <AlertTriangle />
+          </div>
+          <div>
+            <span>High Criticality Assets</span>
+            <strong>{highCriticality}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon green">
+            <CheckCircle2 />
+          </div>
+          <div>
+            <span>Network Status</span>
+            <strong>Operational</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Configured Network Assets</h2>
+            <p>
+              Current reservoir, pipeline and DMA configuration used by the AI
+              workflow
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Loading network configuration...</p>
+        ) : network.length === 0 ? (
+          <p>No network configuration available.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>DMA</th>
+                  <th>Reservoir</th>
+                  <th>Pipeline</th>
+                  <th>Criticality</th>
+                  <th>Network Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {network.map((item, index) => (
+                  <tr key={`${item.dma_id}-${index}`}>
+                    <td>
+                      <strong>{item.dma_id}</strong>
+                    </td>
+
+                    <td>{item.reservoir || "Reservoir-1"}</td>
+
+                    <td>{item.pipe_id || item.pipeline || "N/A"}</td>
+
+                    <td>
+                      <span
+                        className={
+                          item.criticality === "High"
+                            ? "status-badge critical"
+                            : "status-badge warning"
+                        }
+                      >
+                        {item.criticality || "Medium"}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span className="status-badge">Operational</span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Network Configuration Logic</h2>
+            <p>
+              These assets provide the topology context used by anomaly,
+              leak-detection and maintenance agents.
+            </p>
+          </div>
+        </div>
+
+        <div className="approval-box">
+          <div className="approval-icon">
+            <ShieldCheck size={25} />
+          </div>
+
+          <div>
+            <strong>AI Decision-Support Configuration</strong>
+            <p>
+              Network configuration is used for analysis and recommendations.
+              The system does not directly control physical pumps or valves.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ================= PRESSURE & FLOW ANALYTICS ================= */
+
+function PressureFlowAnalyticsPage() {
+  const [sensors, setSensors] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadSensors = async () => {
+      try {
+        const response = await axios.get(`${API}/api/sensors`);
+        setSensors(response.data.data || []);
+      } catch (error) {
+        console.error("Failed to load sensor analytics:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSensors();
+  }, []);
+
+  const averageFlow =
+    sensors.length > 0
+      ? sensors.reduce(
+          (sum, item) => sum + Number(item.inlet_flow_m3h || 0),
+          0,
+        ) / sensors.length
+      : 0;
+
+  const averagePressure =
+    sensors.length > 0
+      ? sensors.reduce((sum, item) => sum + Number(item.pressure_bar || 0), 0) /
+        sensors.length
+      : 0;
+
+  const highestFlow =
+    sensors.length > 0
+      ? Math.max(...sensors.map((item) => Number(item.inlet_flow_m3h || 0)))
+      : 0;
+
+  const lowestPressure =
+    sensors.length > 0
+      ? Math.min(...sensors.map((item) => Number(item.pressure_bar || 0)))
+      : 0;
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <h1>Pressure & Flow Analytics</h1>
+          <p>
+            Analyze hydraulic flow and pressure patterns across monitored
+            distribution zones
+          </p>
+        </div>
+      </section>
+
+      <section className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <Gauge />
+          </div>
+          <div>
+            <span>Average Flow</span>
+            <strong>{averageFlow.toFixed(2)} m³/h</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon purple">
+            <Activity />
+          </div>
+          <div>
+            <span>Average Pressure</span>
+            <strong>{averagePressure.toFixed(2)} bar</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <TrendingUp />
+          </div>
+          <div>
+            <span>Peak Flow</span>
+            <strong>{highestFlow.toFixed(2)} m³/h</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon red">
+            <AlertTriangle />
+          </div>
+          <div>
+            <span>Lowest Pressure</span>
+            <strong>{lowestPressure.toFixed(2)} bar</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>DMA Hydraulic Summary</h2>
+            <p>
+              Current flow and pressure characteristics for each monitored
+              distribution area
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Loading hydraulic data...</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>DMA</th>
+                  <th>Average Flow (m³/h)</th>
+                  <th>Average Pressure (bar)</th>
+                  <th>Maximum Flow (m³/h)</th>
+                  <th>Minimum Pressure (bar)</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {["DMA-A", "DMA-B", "DMA-C"].map((dma) => {
+                  const rows = sensors.filter((item) => item.dma_id === dma);
+
+                  const flows = rows.map((item) =>
+                    Number(item.inlet_flow_m3h || 0),
+                  );
+
+                  const pressures = rows.map((item) =>
+                    Number(item.pressure_bar || 0),
+                  );
+
+                  const dmaAvgFlow =
+                    flows.length > 0
+                      ? flows.reduce((a, b) => a + b, 0) / flows.length
+                      : 0;
+
+                  const dmaAvgPressure =
+                    pressures.length > 0
+                      ? pressures.reduce((a, b) => a + b, 0) / pressures.length
+                      : 0;
+
+                  return (
+                    <tr key={dma}>
+                      <td>
+                        <strong>{dma}</strong>
+                      </td>
+                      <td>{dmaAvgFlow.toFixed(2)}</td>
+                      <td>{dmaAvgPressure.toFixed(2)}</td>
+                      <td>
+                        {flows.length ? Math.max(...flows).toFixed(2) : "0.00"}
+                      </td>
+                      <td>
+                        {pressures.length
+                          ? Math.min(...pressures).toFixed(2)
+                          : "0.00"}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Hydraulic Interpretation</h2>
+            <p>
+              Flow and pressure relationships support anomaly and leak
+              investigation.
+            </p>
+          </div>
+        </div>
+
+        <div className="approval-box">
+          <div className="approval-icon">
+            <AlertTriangle size={25} />
+          </div>
+
+          <div>
+            <strong>AI Analysis Signal</strong>
+            <p>
+              A simultaneous increase in flow and decrease in pressure can
+              strengthen a suspected leak hypothesis when supported by
+              additional evidence such as nighttime demand and topology.
+            </p>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ================= FIELD OPERATIONS ================= */
+
+function FieldOperationsPage() {
+  const [maintenance, setMaintenance] = useState<any[]>([]);
+  const [operations, setOperations] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFieldOperations = async () => {
+      try {
+        const [maintenanceResponse, operationsResponse] = await Promise.all([
+          axios.get(`${API}/api/maintenance`),
+          axios.get(`${API}/api/operations`),
+        ]);
+
+        setMaintenance(maintenanceResponse.data.data || []);
+        setOperations(operationsResponse.data.data || []);
+      } catch (error) {
+        console.error("Failed to load field operations:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadFieldOperations();
+  }, []);
+
+  const activeTeams = new Set(
+    maintenance.map((item) => item.assigned_team).filter(Boolean),
+  ).size;
+
+  const openActions = maintenance.filter(
+    (item) =>
+      !String(item.approval_status || "")
+        .toLowerCase()
+        .includes("completed"),
+  ).length;
+
+  const criticalActions = maintenance.filter(
+    (item) => item.priority === "Priority 1 - Critical",
+  ).length;
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <h1>Field Operations</h1>
+          <p>Inspection teams, field actions and maintenance recommendations</p>
+        </div>
+      </section>
+
+      <section className="kpi-grid">
+        <div className="kpi-card">
+          <div className="kpi-icon blue">
+            <Activity />
+          </div>
+          <div>
+            <span>Active Field Teams</span>
+            <strong>{activeTeams}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon orange">
+            <Wrench />
+          </div>
+          <div>
+            <span>Open Actions</span>
+            <strong>{openActions}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon red">
+            <AlertTriangle />
+          </div>
+          <div>
+            <span>Critical Actions</span>
+            <strong>{criticalActions}</strong>
+          </div>
+        </div>
+
+        <div className="kpi-card">
+          <div className="kpi-icon purple">
+            <ShieldCheck />
+          </div>
+          <div>
+            <span>AI Recommendations</span>
+            <strong>{operations.length}</strong>
+          </div>
+        </div>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Field Maintenance Assignments</h2>
+            <p>
+              AI-prioritized field actions requiring inspection or maintenance
+            </p>
+          </div>
+        </div>
+
+        {loading ? (
+          <p>Loading field operations...</p>
+        ) : maintenance.length === 0 ? (
+          <p>No field actions available.</p>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>DMA</th>
+                  <th>Asset</th>
+                  <th>Priority</th>
+                  <th>Assigned Team</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {maintenance.map((item, index) => (
+                  <tr key={`${item.dma_id}-${index}`}>
+                    <td>
+                      <strong>{item.dma_id}</strong>
+                    </td>
+
+                    <td>{item.pipe_id || "N/A"}</td>
+
+                    <td>
+                      <span
+                        className={
+                          item.priority === "Priority 1 - Critical"
+                            ? "status-badge critical"
+                            : "status-badge warning"
+                        }
+                      >
+                        {item.priority}
+                      </span>
+                    </td>
+
+                    <td>{item.assigned_team || "Unassigned"}</td>
+
+                    <td>
+                      <strong>
+                        {Number(item.priority_score || 0).toFixed(2)}
+                      </strong>
+                    </td>
+
+                    <td>{item.approval_status || "Pending Human Approval"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <div>
+            <h2>Field Action Plan</h2>
+            <p>
+              Recommended actions generated from leak evidence and network
+              conditions
+            </p>
+          </div>
+        </div>
+
+        <div className="dashboard-grid">
+          {maintenance.map((item, index) => (
+            <div className="panel" key={`${item.dma_id}-action-${index}`}>
+              <h3>
+                {item.dma_id} — {item.pipe_id}
+              </h3>
+
+              <p>
+                <strong>Team:</strong> {item.assigned_team || "Unassigned"}
+              </p>
+
+              <p>
+                <strong>Priority:</strong> {item.priority}
+              </p>
+
+              <p>
+                <strong>Reason:</strong>{" "}
+                {item.reason || "Network risk requires field inspection."}
+              </p>
+
+              <p>
+                <strong>Action:</strong>{" "}
+                {item.recommended_action ||
+                  "Inspect the suspected network section and verify field conditions."}
+              </p>
+
+              <div className="approval-box">
+                <div className="approval-icon">
+                  <ShieldCheck size={22} />
+                </div>
+
+                <div>
+                  <strong>Human Approval Required</strong>
+                  <p>
+                    Field teams act only after an authorized operator approves
+                    the recommendation.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ================= AI OPERATIONS CENTER ================= */
+
+function AIOperationsCenterPage() {
+  const [agentStatus, setAgentStatus] = useState<any>(null);
+  const [reviewer, setReviewer] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadAgentStatus = async () => {
+      try {
+        const [agentResponse, reviewerResponse] = await Promise.all([
+          axios.get(`${API}/api/agent-status`),
+          axios.get(`${API}/api/reviewer`),
+        ]);
+
+        setAgentStatus(agentResponse.data);
+        setReviewer(reviewerResponse.data);
+      } catch (error) {
+        console.error("Failed to load agent workflow:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAgentStatus();
+  }, []);
+
+  const agentDetails = [
+    {
+      name: "Monitoring Agent",
+      purpose: "Validates incoming sensor data and network health.",
+      output: "Sensor quality and network status",
+    },
+    {
+      name: "Demand Forecasting Agent",
+      purpose: "Predicts expected water demand using the trained ML model.",
+      output: "Forecast demand",
+    },
+    {
+      name: "Anomaly Detection Agent",
+      purpose: "Identifies abnormal flow, pressure and nighttime conditions.",
+      output: "Anomaly scores",
+    },
+    {
+      name: "Leak Detection Agent",
+      purpose: "Correlates flow, pressure and nighttime evidence.",
+      output: "Leak hypothesis and confidence",
+    },
+    {
+      name: "Water Balance Agent",
+      purpose: "Compares supplied and metered water.",
+      output: "Estimated water loss",
+    },
+    {
+      name: "Maintenance Agent",
+      purpose: "Prioritizes assets and assigns field resources.",
+      output: "Maintenance recommendation",
+    },
+    {
+      name: "Operations Agent",
+      purpose: "Coordinates recommendations and requests human approval.",
+      output: "Operational recommendation",
+    },
+  ];
+
+  return (
+    <>
+      <section className="page-heading">
+        <div>
+          <h1>AI Operations Center</h1>
+          <p>
+            Agent execution visibility, reasoning outputs and human approval
+            workflow
+          </p>
+        </div>
+      </section>
+
+      {loading ? (
+        <section className="panel">
+          <p>Loading AI workflow...</p>
+        </section>
+      ) : (
+        <>
+          <section className="kpi-grid">
+            <div className="kpi-card">
+              <div className="kpi-icon blue">
+                <Activity />
+              </div>
+              <div>
+                <span>AI Agents</span>
+                <strong>{agentStatus?.agents?.length || 7}</strong>
+              </div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon green">
+                <CheckCircle2 />
+              </div>
+              <div>
+                <span>Completed Agents</span>
+                <strong>
+                  {agentStatus?.agents?.filter(
+                    (agent: any) => agent.status === "Completed",
+                  ).length || 0}
+                </strong>
+              </div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon orange">
+                <ShieldCheck />
+              </div>
+              <div>
+                <span>Human Approval</span>
+                <strong>
+                  {agentStatus?.human_approval_required
+                    ? "Required"
+                    : "Not Required"}
+                </strong>
+              </div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon purple">
+                <Wrench />
+              </div>
+              <div>
+                <span>Workflow State</span>
+                <strong>{agentStatus?.workflow_status || "Completed"}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Agent Execution Pipeline</h2>
+                <p>
+                  Seven specialized agents working as a decision-support
+                  workflow
+                </p>
+              </div>
+            </div>
+            <div className="agent-flow">
+              {agentDetails.map((agent, index) => {
+                const actualAgent = agentStatus?.agents?.find(
+                  (item: any) => item.name === agent.name,
+                );
+
+                return (
+                  <div className="agent-step" key={agent.name}>
+                    <div className="agent-number">{index + 1}</div>
+
+                    <div>
+                      <strong>{agent.name}</strong>
+                      <p>{agent.purpose}</p>
+
+                      <small>Output: {agent.output}</small>
+
+                      <div className="operation-status">
+                        <CheckCircle2 size={16} />
+                        {actualAgent?.status || "Completed"}
+                      </div>
+                    </div>
+
+                    {index < agentDetails.length - 1 && (
+                      <div className="arrow">→</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>{" "}
+          </section>
+
+          {/* ================= REVIEWER / CRITIC ================= */}
+
+          <section className="panel">
+            <div className="panel-header">
+              <div>
+                <h2>Reviewer / Critic Feedback</h2>
+                <p>
+                  Independent review of AI-generated maintenance recommendations
+                </p>
+              </div>
+            </div>
+
+            <div className="dashboard-grid">
+              {reviewer?.data?.map((item: any) => (
+                <div className="panel" key={item.dma_id}>
+                  <h3>
+                    {item.dma_id} — {item.review_status}
+                  </h3>
+
+                  <p>
+                    <strong>Evidence:</strong>
+                  </p>
+
+                  <ul>
+                    {item.evidence?.map((evidence: string) => (
+                      <li key={evidence}>{evidence}</li>
+                    ))}
+                  </ul>
+
+                  <p>
+                    <strong>Reviewer Recommendation:</strong>{" "}
+                    {item.reviewer_recommendation}
+                  </p>
+
+                  <div className="operation-status">
+                    <ShieldCheck size={16} />
+                    Human approval required
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {/* ================= AI DECISION EVIDENCE ================= */}
+
+          <section className="dashboard-grid">
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>AI Decision Evidence</h2>
+                  <p>Information used across the decision pipeline</p>
+                </div>
+              </div>
+
+              <div className="approval-box">
+                <div className="approval-icon">
+                  <Activity size={24} />
+                </div>
+
+                <div>
+                  <strong>Sensor & Forecast Evidence</strong>
+                  <p>
+                    Sensor validation, demand forecasting, flow anomalies and
+                    pressure anomalies provide the initial evidence.
+                  </p>
+                </div>
+              </div>
+
+              <div className="approval-box">
+                <div className="approval-icon">
+                  <Droplets size={24} />
+                </div>
+
+                <div>
+                  <strong>Leak & Water-Loss Evidence</strong>
+                  <p>
+                    The leak and water-balance agents combine sensor evidence,
+                    nighttime behavior and network information.
+                  </p>
+                </div>
+              </div>
+
+              <div className="approval-box">
+                <div className="approval-icon">
+                  <Wrench size={24} />
+                </div>
+
+                <div>
+                  <strong>Maintenance Evidence</strong>
+                  <p>
+                    Leak confidence, water loss, infrastructure criticality and
+                    repeated events influence maintenance priority.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="panel">
+              <div className="panel-header">
+                <div>
+                  <h2>Human Decision</h2>
+                  <p>Final operational action remains under human control</p>
+                </div>
+              </div>
+
+              <div className="approval-box">
+                <div className="approval-icon">
+                  <ShieldCheck size={25} />
+                </div>
+
+                <div>
+                  <strong>Human Approval Required</strong>
+                  <p>
+                    The AI system produces recommendations only. An authorized
+                    network operator must approve field operations before
+                    execution.
+                  </p>
+                </div>
+              </div>
+
+              <div className="operation-status">
+                <ShieldCheck size={16} />
+                Workflow:{" "}
+                {agentStatus?.workflow_status || "Awaiting Human Approval"}
+              </div>
+            </div>
+          </section>
+        </>
+      )}
+    </>
   );
 }
 
@@ -501,7 +1600,6 @@ function DashboardPage({
             </div>
             <ShieldCheck size={22} />
           </div>
-
           <div className="approval-box">
             <div className="approval-icon">
               <ShieldCheck size={25} />
@@ -509,7 +1607,11 @@ function DashboardPage({
 
             <div>
               <strong>Human Approval Required</strong>
-              <p>AI recommendations are waiting for operator validation.</p>
+              <p>
+                {dashboard.operations.pending_approvals} AI recommendation
+                {dashboard.operations.pending_approvals === 1 ? "" : "s"}{" "}
+                waiting for operator validation.
+              </p>
             </div>
           </div>
 
@@ -949,7 +2051,6 @@ function AnomaliesPage() {
 
         <div className="summary-cards">
           <div className="mini-card">
-            <span>Flow Analysis</span>
             <strong>
               {data.filter((x) => Math.abs(Number(x.flow_z_score)) >= 2).length}
             </strong>
@@ -979,7 +2080,6 @@ function AnomaliesPage() {
 
       {/* Anomaly Records */}
       <div className="panel">
-        Flow Analysis
         <div className="panel-header">
           <div>
             <h2>Anomaly Events</h2>
@@ -1439,7 +2539,7 @@ function MaintenancePage() {
             "pipe_section",
             "priority",
             "priority_score",
-            "field_team",
+            "assigned_team",
             "status",
             "reason",
           ]}
@@ -1466,20 +2566,159 @@ function MaintenancePage() {
 /* ================= OPERATIONS ================= */
 
 function OperationsPage() {
+  const agentWorkflow = [
+    {
+      name: "Monitoring Agent",
+      icon: "🔍",
+      description: "Validates sensor data and network health",
+    },
+    {
+      name: "Demand Forecasting Agent",
+      icon: "📈",
+      description: "Forecasts expected water demand",
+    },
+    {
+      name: "Anomaly Detection Agent",
+      icon: "⚠️",
+      description: "Detects abnormal flow and pressure patterns",
+    },
+    {
+      name: "Leak Detection Agent",
+      icon: "💧",
+      description: "Correlates evidence and assesses leak risk",
+    },
+    {
+      name: "Water Balance Agent",
+      icon: "📊",
+      description: "Calculates water loss and unexplained consumption",
+    },
+    {
+      name: "Maintenance Agent",
+      icon: "🛠️",
+      description: "Prioritizes maintenance and field resources",
+    },
+    {
+      name: "Operations Agent",
+      icon: "👷",
+      description: "Prepares human-reviewed operational actions",
+    },
+  ];
   const [data, setData] = useState<Operation[]>([]);
+  const [agentStatuses, setAgentStatuses] = useState<Record<string, string>>(
+    {},
+  );
+  const [approvalStatus, setApprovalStatus] = useState<Record<string, string>>(
+    {},
+  );
+  const [repairValidation, setRepairValidation] = useState<Record<string, any>>(
+    {},
+  );
+
+  const [approvalMessage, setApprovalMessage] = useState("");
 
   useEffect(() => {
+    // Load operations recommendations
     axios
       .get(`${API}/api/operations`)
-      .then((res) => setData(res.data.data))
-      .catch(() => {});
+      .then((res) => {
+        console.log("OPERATIONS API:", res.data);
+
+        if (Array.isArray(res.data)) {
+          setData(res.data);
+        } else if (Array.isArray(res.data.data)) {
+          setData(res.data.data);
+        } else {
+          console.error("Unexpected operations response:", res.data);
+          setData([]);
+        }
+      })
+      .catch((error) => {
+        console.error("Operations data fetch failed:", error);
+      });
+
+    // Load agent execution status
+    axios
+      .get(`${API}/api/agent-status`)
+      .then((res) => {
+        console.log("AGENT STATUS API:", res.data);
+
+        const statuses: Record<string, string> = {};
+
+        if (Array.isArray(res.data.agents)) {
+          res.data.agents.forEach((agent: any) => {
+            statuses[agent.name] = agent.status;
+          });
+        }
+
+        setAgentStatuses(statuses);
+      })
+      .catch((error) => {
+        console.error("Agent status fetch failed:", error);
+      });
   }, []);
+
+  const handleApproval = async (
+    dmaId: string,
+    action: "approve" | "reject",
+  ) => {
+    try {
+      const response = await axios.post(
+        `${API}/api/operations/${dmaId}/approval`,
+        {
+          action,
+          approved_by: "Network Operator",
+          observation:
+            action === "approve"
+              ? "Field inspection approved."
+              : "Operation rejected for further review.",
+        },
+      );
+
+      setApprovalStatus((prev) => ({
+        ...prev,
+        [dmaId]: response.data.approval_status,
+      }));
+
+      setApprovalMessage(`${dmaId}: ${response.data.approval_status}`);
+    } catch (error) {
+      console.error("Approval update failed:", error);
+      setApprovalMessage(`${dmaId}: Approval request failed`);
+    }
+  };
+
+  const handleRepair = async (dmaId: string) => {
+    try {
+      await axios.post(`${API}/api/operations/${dmaId}/repair`, {
+        repair_status: "completed",
+        completed_by: "Field Team",
+        observation: "Field inspection and repair completed successfully.",
+      });
+
+      const validationResponse = await axios.get(
+        `${API}/api/operations/${dmaId}/repair-validation`,
+      );
+
+      const validation = validationResponse.data;
+
+      setRepairValidation((prev) => ({
+        ...prev,
+        [dmaId]: validation,
+      }));
+
+      setApprovalMessage(`${dmaId}: ${validation.validation_result}`);
+    } catch (error) {
+      console.error("Repair validation failed:", error);
+
+      setApprovalMessage(`${dmaId}: Repair validation failed`);
+    }
+  };
 
   const critical = data.filter((x) => x.priority.includes("Critical")).length;
 
-  const pending = data.filter((x) =>
-    x.approval_status.toLowerCase().includes("pending"),
-  ).length;
+  const pending = data.filter((x) => {
+    const status = approvalStatus[x.dma_id] || x.approval_status;
+    return status.toLowerCase().includes("pending");
+  }).length;
 
   return (
     <>
@@ -1574,6 +2813,86 @@ function OperationsPage() {
         </div>
       </div>
 
+      <div
+        style={{
+          marginBottom: "24px",
+          padding: "20px",
+          borderRadius: "12px",
+          background: "#111827",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <h2 style={{ marginBottom: "8px" }}>🤖 Agent Execution Workflow</h2>
+
+        <p
+          style={{
+            color: "#94a3b8",
+            marginBottom: "18px",
+          }}
+        >
+          Evidence flows from detection agents to human-reviewed operational
+          recommendations.
+        </p>
+
+        <div
+          style={{
+            display: "flex",
+            gap: "12px",
+            flexWrap: "wrap",
+          }}
+        >
+          {agentWorkflow.map((agent, index) => (
+            <div
+              key={agent.name}
+              style={{
+                flex: "1 1 180px",
+                minWidth: "180px",
+                padding: "14px",
+                borderRadius: "10px",
+                background: "#172033",
+                border: "1px solid #334155",
+              }}
+            >
+              <div style={{ fontSize: "24px", marginBottom: "8px" }}>
+                {agent.icon}
+              </div>
+
+              <strong>{agent.name}</strong>
+
+              <p
+                style={{
+                  marginTop: "6px",
+                  fontSize: "13px",
+                  color: "#94a3b8",
+                  lineHeight: 1.4,
+                }}
+              >
+                {agent.description}
+              </p>
+              <span
+                style={{
+                  display: "inline-block",
+                  marginTop: "8px",
+                  padding: "4px 8px",
+                  borderRadius: "999px",
+                  fontSize: "11px",
+                  background:
+                    agentStatuses[agent.name] === "Awaiting Human Approval"
+                      ? "#78350f"
+                      : "#14532d",
+                  color:
+                    agentStatuses[agent.name] === "Awaiting Human Approval"
+                      ? "#fbbf24"
+                      : "#86efac",
+                }}
+              >
+                {agentStatuses[agent.name] || "Loading..."}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Recommendations */}
       <div className="operations-grid">
         {data.map((item, index) => (
@@ -1582,6 +2901,179 @@ function OperationsPage() {
               <span className="priority-tag">{item.priority}</span>
 
               <Clock3 size={18} />
+              <div
+                style={{
+                  marginTop: "18px",
+                  paddingTop: "15px",
+                  borderTop: "1px solid rgba(255,255,255,0.08)",
+                }}
+              >
+                <strong>Human Approval</strong>
+
+                <div
+                  style={{
+                    marginTop: "10px",
+                    display: "flex",
+                    gap: "10px",
+                    flexWrap: "wrap",
+                  }}
+                >
+                  {(
+                    approvalStatus[item.dma_id] ||
+                    item.approval_status ||
+                    ""
+                  ).toLowerCase() === "pending human approval" ? (
+                    <>
+                      <button
+                        onClick={() => handleApproval(item.dma_id, "approve")}
+                        style={{
+                          padding: "9px 16px",
+                          borderRadius: "6px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: "#16a34a",
+                          color: "white",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✓ Approve
+                      </button>
+
+                      <button
+                        onClick={() => handleApproval(item.dma_id, "reject")}
+                        style={{
+                          padding: "9px 16px",
+                          borderRadius: "6px",
+                          border: "none",
+                          cursor: "pointer",
+                          background: "#dc2626",
+                          color: "white",
+                          fontWeight: 600,
+                        }}
+                      >
+                        ✕ Reject
+                      </button>
+                    </>
+                  ) : (
+                    <span
+                      style={{
+                        padding: "9px 16px",
+                        borderRadius: "6px",
+                        background: "#172033",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✓ {approvalStatus[item.dma_id] || item.approval_status}
+                    </span>
+                  )}
+
+                  <button
+                    onClick={() => handleRepair(item.dma_id)}
+                    disabled={
+                      (
+                        approvalStatus[item.dma_id] ||
+                        item.approval_status ||
+                        ""
+                      ).toLowerCase() !== "approved"
+                    }
+                    style={{
+                      padding: "9px 16px",
+                      borderRadius: "6px",
+                      border: "none",
+                      cursor:
+                        (
+                          approvalStatus[item.dma_id] ||
+                          item.approval_status ||
+                          ""
+                        ).toLowerCase() === "approved"
+                          ? "pointer"
+                          : "not-allowed",
+                      background:
+                        (
+                          approvalStatus[item.dma_id] ||
+                          item.approval_status ||
+                          ""
+                        ).toLowerCase() === "approved"
+                          ? "#2563eb"
+                          : "#e5e7eb",
+                      color:
+                        (
+                          approvalStatus[item.dma_id] ||
+                          item.approval_status ||
+                          ""
+                        ).toLowerCase() === "approved"
+                          ? "white"
+                          : "#9ca3af",
+                      fontWeight: 600,
+                      opacity:
+                        (
+                          approvalStatus[item.dma_id] ||
+                          item.approval_status ||
+                          ""
+                        ).toLowerCase() === "approved"
+                          ? 1
+                          : 0.6,
+                    }}
+                  >
+                    🔧 Complete Repair
+                  </button>
+                </div>
+                {repairValidation[item.dma_id] && (
+                  <div
+                    style={{
+                      marginTop: "12px",
+                      padding: "12px 14px",
+                      borderRadius: "8px",
+                      background: "#172033",
+                      border: "1px solid #334155",
+                      color: "white",
+                    }}
+                  >
+                    <strong>Post-Repair Validation</strong>
+
+                    <div style={{ marginTop: "8px" }}>
+                      Status:{" "}
+                      <strong>
+                        {repairValidation[item.dma_id].validation_result}
+                      </strong>
+                    </div>
+
+                    <div style={{ marginTop: "6px" }}>
+                      Flow reduction:{" "}
+                      <strong>
+                        {
+                          repairValidation[item.dma_id].improvement
+                            .flow_reduction_percent
+                        }
+                        %
+                      </strong>
+                    </div>
+
+                    <div style={{ marginTop: "6px" }}>
+                      Pressure change:{" "}
+                      <strong>
+                        {
+                          repairValidation[item.dma_id].improvement
+                            .pressure_increase_percent
+                        }
+                        %
+                      </strong>
+                    </div>
+
+                    <div style={{ marginTop: "6px" }}>
+                      Leak risk:{" "}
+                      <strong>{repairValidation[item.dma_id].leak_risk}</strong>
+                    </div>
+                  </div>
+                )}
+
+                {approvalStatus[item.dma_id] && (
+                  <p style={{ marginTop: "10px" }}>
+                    Validation Status:{" "}
+                    <strong>{approvalStatus[item.dma_id]}</strong>
+                  </p>
+                )}
+              </div>
             </div>
 
             <h3>
@@ -1594,10 +3086,11 @@ function OperationsPage() {
               <strong>Evidence</strong>
               <p>{item.evidence_summary}</p>
             </div>
-
             <div className="operation-status">
               <ShieldCheck size={16} />
-              {item.approval_status}
+              {repairValidation[item.dma_id]
+                ? repairValidation[item.dma_id].validation_result
+                : approvalStatus[item.dma_id] || item.approval_status}
             </div>
           </div>
         ))}
@@ -1693,6 +3186,234 @@ function ReportsPage() {
   );
 }
 
+/* ================= LIVE NETWORK MAP ================= */
+
+function LiveNetworkMapPage() {
+  const [network, setNetwork] = useState<any[]>([]);
+  const [leaks, setLeaks] = useState<any[]>([]);
+  const [waterBalance, setWaterBalance] = useState<any[]>([]);
+
+  useEffect(() => {
+    axios
+      .get(`${API}/api/network`)
+      .then((res) => {
+        setNetwork(res.data.data);
+      })
+      .catch((error) => {
+        console.error("Network data fetch failed:", error);
+      });
+
+    axios
+      .get(`${API}/api/leaks`)
+      .then((res) => {
+        setLeaks(res.data.data);
+      })
+      .catch((error) => {
+        console.error("Leak data fetch failed:", error);
+      });
+
+    axios
+      .get(`${API}/api/water-balance`)
+      .then((res) => {
+        setWaterBalance(res.data.data);
+      })
+      .catch((error) => {
+        console.error("Water balance fetch failed:", error);
+      });
+  }, []);
+
+  const getLatestLeak = (dmaId: string) => {
+    const dmaLeaks = leaks.filter((item) => item.dma_id === dmaId);
+
+    if (dmaLeaks.length === 0) {
+      return null;
+    }
+
+    return dmaLeaks.reduce((highest, current) => {
+      return Number(current.leak_score) > Number(highest.leak_score)
+        ? current
+        : highest;
+    });
+  };
+
+  const getLoss = (dmaId: string) => {
+    const item = waterBalance.find((record) => record.dma_id === dmaId);
+
+    return item ? Number(item.water_loss_percentage).toFixed(2) : "0.00";
+  };
+
+  return (
+    <>
+      <PageTitle
+        title="Live Network Map"
+        subtitle="Water distribution topology, leak evidence and asset status"
+        icon={<Map />}
+      />
+
+      <div className="panel">
+        <div style={{ padding: "30px" }}>
+          <h2>Water Distribution Network</h2>
+
+          <p>
+            Live topology view using leak detection and water-balance
+            intelligence.
+          </p>
+
+          {/* Reservoir */}
+          <div
+            className="kpi-card"
+            style={{
+              marginTop: "30px",
+              marginBottom: "25px",
+            }}
+          >
+            <Gauge size={26} />
+
+            <div>
+              <strong>Reservoir-1</strong>
+              <span>Network Source</span>
+            </div>
+          </div>
+
+          {/* DMA cards */}
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))",
+              gap: "20px",
+            }}
+          >
+            {network.map((item) => {
+              const leak = getLatestLeak(item.dma_id);
+
+              const confidence = leak?.confidence || "Normal";
+
+              const status =
+                confidence === "High"
+                  ? "Suspected Leak"
+                  : confidence === "Medium"
+                    ? "Investigation Required"
+                    : "Normal";
+
+              const statusClass =
+                confidence === "High"
+                  ? "danger"
+                  : confidence === "Medium"
+                    ? "warning"
+                    : "success";
+
+              return (
+                <div className="operation-card" key={item.dma_id}>
+                  <div className="operation-top">
+                    <span className="priority-tag">
+                      {item.criticality} Criticality
+                    </span>
+
+                    <Droplets size={20} />
+                  </div>
+
+                  <h3>
+                    {item.pipe_section} → {item.dma_id}
+                  </h3>
+
+                  <p>
+                    Reservoir-1 → {item.pipe_section} → {item.dma_id}
+                  </p>
+
+                  <div
+                    style={{
+                      marginTop: "15px",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <strong>Status</strong>
+
+                    <span className={`status-badge ${statusClass}`}>
+                      {status}
+                    </span>
+                  </div>
+
+                  <div
+                    style={{
+                      marginTop: "15px",
+                      paddingTop: "15px",
+                      borderTop: "1px solid rgba(255,255,255,0.08)",
+                    }}
+                  >
+                    <p>
+                      <strong>Leak Score:</strong> {leak ? leak.leak_score : 0}
+                    </p>
+
+                    <p>
+                      <strong>Confidence:</strong> {confidence}
+                    </p>
+
+                    <p>
+                      <strong>Water Loss:</strong> {getLoss(item.dma_id)}%
+                    </p>
+                  </div>
+
+                  {/* Evidence */}
+                  {leak && (
+                    <div
+                      style={{
+                        marginTop: "15px",
+                        paddingTop: "15px",
+                        borderTop: "1px solid rgba(255,255,255,0.08)",
+                      }}
+                    >
+                      <strong>Leak Evidence</strong>
+
+                      <div
+                        style={{
+                          marginTop: "10px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: "7px",
+                        }}
+                      >
+                        <span>
+                          {leak.flow_evidence ? "✓" : "✗"} Flow anomaly
+                        </span>
+
+                        <span>
+                          {leak.pressure_evidence ? "✓" : "✗"} Pressure anomaly
+                        </span>
+
+                        <span>
+                          {leak.nighttime_evidence ? "✓" : "✗"} Nighttime high
+                          flow
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Hypothesis */}
+                  {leak?.leak_hypothesis && (
+                    <div
+                      style={{
+                        marginTop: "15px",
+                        padding: "12px",
+                        borderRadius: "8px",
+                        background: "rgba(255,255,255,0.04)",
+                      }}
+                    >
+                      <strong>AI Assessment</strong>
+
+                      <p style={{ marginTop: "8px" }}>{leak.leak_hypothesis}</p>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
 /* ================= HELPERS ================= */
 
 function PageTitle({

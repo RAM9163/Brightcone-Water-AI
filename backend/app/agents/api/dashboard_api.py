@@ -202,3 +202,41 @@ def generate_pdf_report():
         media_type="application/pdf",
         filename=report_path.name,
     )
+
+    @router.get("/agent-status")
+def get_agent_status():
+
+    return {
+        "workflow_status": "Completed",
+        "agents": [
+            {
+                "name": "Monitoring Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Demand Forecasting Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Anomaly Detection Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Leak Detection Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Water Balance Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Maintenance Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Operations Agent",
+                "status": "Awaiting Human Approval"
+            }
+        ],
+        "human_approval_required": True
+    }

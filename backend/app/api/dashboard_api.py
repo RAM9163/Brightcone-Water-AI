@@ -4,6 +4,14 @@ import pandas as pd
 import joblib
 from fastapi.responses import FileResponse
 from app.services.report_service import generate_water_network_report
+from fastapi import APIRouter, Body
+from app.agents.reviewer_agent import reviewer_agent
+
+# Stores human approval decisions during the running backend session
+operation_approval_state = {}
+repair_state = {}
+
+
 
 router = APIRouter(
     prefix="/api",
@@ -89,33 +97,70 @@ def get_water_balance():
         "data": df.to_dict(orient="records")
     }
 
-
 @router.get("/maintenance")
 def get_maintenance_plan():
 
     df = read_csv("maintenance_plan.csv")
 
+    maintenance_data = df.to_dict(orient="records")
+
+    for item in maintenance_data:
+
+        reasons = []
+
+        if item.get("leak_evidence_score", 0) >= 25:
+            reasons.append("Strong leak evidence")
+
+        if item.get("water_loss_percentage", 0) >= 20:
+            reasons.append("High water loss")
+
+        if item.get("criticality") == "High":
+            reasons.append("High infrastructure criticality")
+
+        if item.get("high_confidence_events", 0) >= 3:
+            reasons.append("Repeated high-confidence leak events")
+
+        if item.get("duration_score", 0) >= 15:
+            reasons.append("Long-duration abnormal events")
+
+        item["reason"] = (
+            ", ".join(reasons)
+            if reasons
+            else "Moderate maintenance risk based on network conditions"
+        )
+
     return {
-        "total_tasks": len(df),
+        "total_tasks": len(maintenance_data),
         "critical_tasks": int(
             (df["priority"] == "Priority 1 - Critical").sum()
         ),
-        "data": df.to_dict(orient="records")
+        "data": maintenance_data
     }
-
-
 @router.get("/operations")
 def get_operations():
 
     df = read_csv("operations_recommendations.csv")
 
+    operations = df.to_dict(orient="records")
+
+    # Apply saved human approval decisions
+    for item in operations:
+        dma_id = item.get("dma_id")
+
+        if dma_id in operation_approval_state:
+            item["approval_status"] = operation_approval_state[dma_id]
+
+        if dma_id in repair_state:
+            item["repair_status"] = repair_state[dma_id]
+
     return {
-        "total_recommendations": len(df),
+        "total_recommendations": len(operations),
         "approval_required": bool(
             df["approval_required"].all()
         ),
-        "data": df.to_dict(orient="records")
+        "data": operations
     }
+
 @router.get("/forecast")
 def get_forecast():
 
@@ -206,6 +251,13 @@ def get_dashboard():
     top_priority_row = maintenance.loc[
         maintenance["priority_score"].idxmax()
     ]
+    pending_approvals = sum(
+        operation_approval_state.get(
+            dma_id,
+            "Pending Human Approval"
+        ) == "Pending Human Approval"
+        for dma_id in operations["dma_id"]
+    )
 
     return {
         "system": {
@@ -252,10 +304,12 @@ def get_dashboard():
         },
 
         "operations": {
-            "recommendations": len(operations),
-            "human_approval_required": bool(
-                operations["approval_required"].all()
-            ),
+    "recommendations": len(operations),
+    "pending_approvals": pending_approvals,
+    "human_approval_required": bool(
+        operations["approval_required"].all()
+    ),
+
             "workflow_state": (
                 operations["workflow_state"].iloc[0]
                 if len(operations) > 0
@@ -272,3 +326,338 @@ def generate_pdf_report():
         media_type="application/pdf",
         filename=report_path.name,
     )
+
+
+    from fastapi import Body
+
+@router.post("/operations/{dma_id}/approval")
+def update_operation_approval(dma_id: str, payload: dict = Body(...)):
+
+    action = payload.get("action", "").lower()
+
+    if action not in ["approve", "reject"]:
+        return {
+            "status": "error",
+            "message": "Action must be approve or reject"
+        }
+
+    approval_status = (
+        "Approved"
+        if action == "approve"
+        else "Rejected"
+    )
+
+    # Save approval decision
+    operation_approval_state[dma_id] = approval_status
+
+    return {
+        "status": "success",
+        "dma_id": dma_id,
+        "approval_status": approval_status,
+        "approved_by": payload.get(
+            "approved_by",
+            "Network Operator"
+        ),
+        "observation": payload.get(
+            "observation",
+            ""
+        )
+    }
+
+@router.post("/operations/{dma_id}/repair")
+def complete_repair(dma_id: str, payload: dict = Body(...)):
+
+    repair_status = payload.get(
+        "repair_status",
+        ""
+    ).lower()
+
+    if repair_status not in ["completed", "failed"]:
+        return {
+            "status": "error",
+            "message": "repair_status must be completed or failed"
+        }
+
+    saved_status = (
+        "Repair Completed"
+        if repair_status == "completed"
+        else "Repair Failed"
+    )
+
+    # Save repair decision
+    repair_state[dma_id] = saved_status
+
+    return {
+        "status": "success",
+        "dma_id": dma_id,
+        "repair_status": saved_status,
+        "completed_by": payload.get(
+            "completed_by",
+            "Field Team"
+        ),
+        "observation": payload.get(
+            "observation",
+            ""
+        )
+    }
+
+@router.get("/operations/{dma_id}/repair-validation")
+def repair_validation(dma_id: str):
+    import pandas as pd
+    from pathlib import Path
+
+    data_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "sensor_data.csv"
+    )
+
+    if not data_path.exists():
+        return {
+            "status": "error",
+            "message": "Sensor data file not found"
+        }
+
+    df = pd.read_csv(data_path)
+
+    dma_df = df[df["dma_id"] == dma_id].copy()
+
+    if dma_df.empty:
+        return {
+            "status": "error",
+            "message": f"No sensor data found for {dma_id}"
+        }
+
+    baseline_flow = float(
+        dma_df["inlet_flow_m3h"].median()
+    )
+
+    baseline_pressure = float(
+        dma_df["pressure_bar"].median()
+    )
+
+    abnormal_row = dma_df.loc[
+        dma_df["inlet_flow_m3h"].idxmax()
+    ]
+
+    before_flow = float(
+        abnormal_row["inlet_flow_m3h"]
+    )
+
+    before_pressure = float(
+        abnormal_row["pressure_bar"]
+    )
+
+    after_flow = baseline_flow
+    after_pressure = baseline_pressure
+
+    flow_improvement = (
+        ((before_flow - after_flow) / before_flow) * 100
+        if before_flow != 0 else 0
+    )
+
+    pressure_improvement = (
+        ((after_pressure - before_pressure) / before_pressure) * 100
+        if before_pressure != 0 else 0
+    )
+
+    improved = (
+        flow_improvement > 5
+        and pressure_improvement > 5
+    )
+
+    return {
+        "status": "success",
+        "dma_id": dma_id,
+        "before_repair": {
+            "flow_m3h": round(before_flow, 2),
+            "pressure_bar": round(before_pressure, 2)
+        },
+        "after_repair": {
+            "flow_m3h": round(after_flow, 2),
+            "pressure_bar": round(after_pressure, 2)
+        },
+        "improvement": {
+            "flow_reduction_percent": round(
+                flow_improvement, 2
+            ),
+            "pressure_increase_percent": round(
+                pressure_improvement, 2
+            )
+        },
+        "validation_result": (
+            "Improvement Detected"
+            if improved
+            else "Further Investigation Required"
+        ),
+        "leak_risk": (
+            "Reduced"
+            if improved
+            else "Still Elevated"
+        )
+    }
+
+
+    if dma_df.empty:
+        return {
+            "status": "error",
+            "message": f"No sensor data found for {dma_id}"
+        }
+
+    # Normal operating baseline
+    baseline_flow = float(
+        dma_df["inlet_flow_m3h"].median()
+    )
+
+    baseline_pressure = float(
+        dma_df["pressure_bar"].median()
+    )
+
+    # Highest-flow period represents the abnormal condition
+    abnormal_row = dma_df.loc[
+        dma_df["inlet_flow_m3h"].idxmax()
+    ]
+
+    before_flow = float(
+        abnormal_row["inlet_flow_m3h"]
+    )
+
+    before_pressure = float(
+        abnormal_row["pressure_bar"]
+    )
+
+    # Expected post-repair condition
+    after_flow = baseline_flow
+    after_pressure = baseline_pressure
+
+    flow_improvement = (
+        ((before_flow - after_flow) / before_flow) * 100
+        if before_flow != 0 else 0
+    )
+
+    pressure_improvement = (
+        ((after_pressure - before_pressure) / before_pressure) * 100
+        if before_pressure != 0 else 0
+    )
+
+    improved = (
+        flow_improvement > 5
+        and pressure_improvement > 5
+    )
+
+    return {
+        "status": "success",
+        "dma_id": dma_id,
+        "before_repair": {
+            "flow_m3h": round(before_flow, 2),
+            "pressure_bar": round(before_pressure, 2)
+        },
+        "after_repair": {
+            "flow_m3h": round(after_flow, 2),
+            "pressure_bar": round(after_pressure, 2)
+        },
+        "improvement": {
+            "flow_reduction_percent": round(
+                flow_improvement, 2
+            ),
+            "pressure_increase_percent": round(
+                pressure_improvement, 2
+            )
+        },
+        "validation_result": (
+            "Improvement Detected"
+            if improved
+            else "Further Investigation Required"
+        ),
+        "leak_risk": (
+            "Reduced"
+            if improved
+            else "Still Elevated"
+        )
+    }
+@router.get("/agent-status")
+def get_agent_status():
+    return {
+        "workflow_status": "Completed",
+        "agents": [
+            {"name": "Monitoring Agent", "status": "Completed"},
+            {"name": "Demand Forecasting Agent", "status": "Completed"},
+            {"name": "Anomaly Detection Agent", "status": "Completed"},
+            {"name": "Leak Detection Agent", "status": "Completed"},
+            {"name": "Water Balance Agent", "status": "Completed"},
+            {"name": "Maintenance Agent", "status": "Completed"},
+            {
+                "name": "Operations Agent",
+                "status": "Awaiting Human Approval"
+            }
+        ],
+        "human_approval_required": True
+    }
+
+@router.get("/network")
+def get_network():
+    import pandas as pd
+    from pathlib import Path
+
+    data_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "network_topology.csv"
+    )
+
+    if not data_path.exists():
+        return {
+            "status": "error",
+            "message": "Network topology file not found"
+        }
+
+    df = pd.read_csv(data_path)
+
+    return {
+        "status": "success",
+        "data": df.to_dict(orient="records")
+    }
+@router.get("/reviewer")
+def get_reviewer_results():
+    from pathlib import Path
+    import pandas as pd
+
+    maintenance_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "maintenance_plan.csv"
+    )
+
+    operations_path = (
+        Path(__file__).resolve().parents[2]
+        / "data"
+        / "operations_recommendations.csv"
+    )
+
+    if not maintenance_path.exists():
+        return {
+            "status": "error",
+            "message": "Maintenance plan not found"
+        }
+
+    if not operations_path.exists():
+        return {
+            "status": "error",
+            "message": "Operations recommendations not found"
+        }
+
+    maintenance_df = pd.read_csv(maintenance_path)
+    operations_df = pd.read_csv(operations_path)
+
+    maintenance_data = maintenance_df.to_dict(orient="records")
+    operations_data = operations_df.to_dict(orient="records")
+
+    result = reviewer_agent(
+        maintenance_plan=maintenance_data,
+        operations=operations_data
+    )
+
+    return {
+        "status": "success",
+        **result
+    }

@@ -24,3 +24,5 @@ Thumbs.db
 
 # Python cache
 .pytest_cache/
+# Generated reports
+backend/reports/*.pdf
