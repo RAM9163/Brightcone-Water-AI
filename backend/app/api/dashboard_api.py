@@ -2,6 +2,8 @@ from fastapi import APIRouter, HTTPException
 from pathlib import Path
 import pandas as pd
 import joblib
+from fastapi.responses import FileResponse
+from app.services.report_service import generate_water_network_report
 
 router = APIRouter(
     prefix="/api",
@@ -261,3 +263,12 @@ def get_dashboard():
             )
         }
     }
+@router.get("/report/pdf")
+def generate_pdf_report():
+    report_path = generate_water_network_report()
+
+    return FileResponse(
+        path=str(report_path),
+        media_type="application/pdf",
+        filename=report_path.name,
+    )

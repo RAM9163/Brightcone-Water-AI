@@ -40,7 +40,8 @@ type Page =
   | "Leak Detection"
   | "Water Balance"
   | "Maintenance"
-  | "Operations";
+  | "Operations"
+  | "Reports";
 
 interface DashboardData {
   system: {
@@ -189,7 +190,6 @@ function App() {
     icon: React.ReactNode;
   }[] = [
     { name: "Dashboard", icon: <Activity size={19} /> },
-    ,
     { name: "Network Monitoring", icon: <Gauge size={19} /> },
     { name: "Demand Forecasting", icon: <TrendingUp size={19} /> },
     { name: "Anomalies", icon: <AlertTriangle size={19} /> },
@@ -197,6 +197,7 @@ function App() {
     { name: "Water Balance", icon: <Droplets size={19} /> },
     { name: "Maintenance", icon: <Wrench size={19} /> },
     { name: "Operations", icon: <ShieldCheck size={19} /> },
+    { name: "Reports", icon: <BarChart3 size={19} /> },
   ];
 
   return (
@@ -274,6 +275,8 @@ function App() {
         {page === "Maintenance" && <MaintenancePage />}
 
         {page === "Operations" && <OperationsPage />}
+
+        {page === "Reports" && <ReportsPage />}
 
         <footer>
           <span>Brightcone Water Distribution AI</span>
@@ -1609,6 +1612,81 @@ function OperationsPage() {
             No automatic physical control is performed by the AI system. Pumps,
             valves and other infrastructure remain under operator control.
           </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+/* ================= REPORTS ================= */
+
+function ReportsPage() {
+  const [downloading, setDownloading] = useState(false);
+
+  const downloadReport = async () => {
+    setDownloading(true);
+
+    try {
+      const response = await axios.get(`${API}/api/report/pdf`, {
+        responseType: "blob",
+      });
+
+      const url = window.URL.createObjectURL(
+        new Blob([response.data], { type: "application/pdf" }),
+      );
+
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "water_network_report.pdf";
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Report download failed:", error);
+      alert(
+        "Unable to generate the PDF report. Please make sure the backend is running.",
+      );
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  return (
+    <>
+      <PageTitle
+        title="Water Network Reports"
+        subtitle="Generate and download the latest AI network assessment report"
+        icon={<BarChart3 />}
+      />
+
+      <div className="panel">
+        <div style={{ padding: "30px" }}>
+          <div className="page-title-icon">
+            <BarChart3 size={32} />
+          </div>
+
+          <h2>Water Network PDF Report</h2>
+
+          <p>
+            Generate a comprehensive report containing network monitoring,
+            demand forecasting, anomaly detection, leak assessment, water
+            balance, maintenance priorities, and operational recommendations.
+          </p>
+
+          <br />
+
+          <button
+            className="refresh-button"
+            onClick={downloadReport}
+            disabled={downloading}
+          >
+            <BarChart3 size={17} />
+
+            {downloading ? "Generating Report..." : "Download PDF Report"}
+          </button>
         </div>
       </div>
     </>
