@@ -1,0 +1,4 @@
+dma_id,total_water_supplied_m3,total_metered_consumption_m3,average_pressure_bar,unexplained_water_m3,water_loss_percentage,hours,average_hourly_loss_m3,high_confidence_leak_events,loss_severity,recommendation
+DMA-A,84465.18,65430.48,4.103180555555555,19034.69999999999,22.535558439584207,720,26.43708333333332,0,High,Investigate high unexplained water loss and validate meters and network conditions.
+DMA-B,94517.16,73030.51,3.9901944444444446,21486.65000000001,22.733067730769744,720,29.842569444444457,4,High,Prioritize field inspection because high-confidence leak evidence is present.
+DMA-C,74842.33,57671.8,4.1924166666666665,17170.53,22.94227077109972,720,23.84795833333333,5,High,Prioritize field inspection because high-confidence leak evidence is present.

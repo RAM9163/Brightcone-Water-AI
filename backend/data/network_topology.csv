@@ -1,0 +1,4 @@
+dma_id,upstream_node,downstream_node,pipe_section,criticality
+DMA-A,Reservoir-1,Zone-A,Pipe-A1,Medium
+DMA-B,Reservoir-1,Zone-B,Pipe-B1,High
+DMA-C,Reservoir-1,Zone-C,Pipe-C1,High
