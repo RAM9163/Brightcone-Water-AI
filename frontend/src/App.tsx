@@ -2614,8 +2614,6 @@ function OperationsPage() {
     {},
   );
 
-  const [approvalMessage, setApprovalMessage] = useState("");
-
   useEffect(() => {
     // Load operations recommendations
     axios
@@ -2678,11 +2676,8 @@ function OperationsPage() {
         ...prev,
         [dmaId]: response.data.approval_status,
       }));
-
-      setApprovalMessage(`${dmaId}: ${response.data.approval_status}`);
     } catch (error) {
       console.error("Approval update failed:", error);
-      setApprovalMessage(`${dmaId}: Approval request failed`);
     }
   };
 
@@ -2704,12 +2699,8 @@ function OperationsPage() {
         ...prev,
         [dmaId]: validation,
       }));
-
-      setApprovalMessage(`${dmaId}: ${validation.validation_result}`);
     } catch (error) {
       console.error("Repair validation failed:", error);
-
-      setApprovalMessage(`${dmaId}: Repair validation failed`);
     }
   };
 
@@ -2841,7 +2832,7 @@ function OperationsPage() {
             flexWrap: "wrap",
           }}
         >
-          {agentWorkflow.map((agent, index) => (
+          {agentWorkflow.map((agent) => (
             <div
               key={agent.name}
               style={{
