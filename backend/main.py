@@ -16,12 +16,12 @@ app = FastAPI(
 
 # Allow React frontend to communicate with FastAPI
 frontend_url = os.getenv("FRONTEND_URL", "")
-
 allowed_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
     "http://localhost:5174",
     "http://127.0.0.1:5174",
+    "https://brightcone-water-ai-six.vercel.app",
 ]
 
 if frontend_url:
