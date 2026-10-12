@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from app.services.report_service import generate_water_network_report
 from fastapi import APIRouter, Body
 from app.agents.reviewer_agent import reviewer_agent
+from pydantic import BaseModel
 
 # Stores human approval decisions during the running backend session
 operation_approval_state = {}
@@ -232,6 +233,52 @@ def get_forecast():
         "mae": 6.83,
         "rmse": 8.46,
         "records": results
+    }
+
+
+
+
+class ForecastInput(BaseModel):
+    hour: int
+    day_of_week: int
+    day_of_month: int
+    lag_1: float
+    lag_24: float
+    rolling_6h: float
+
+
+@router.post("/forecast/predict")
+def predict_manual_forecast(input_data: ForecastInput):
+
+    model_path = (
+        PROJECT_ROOT.parent
+        / "models"
+        / "demand_forecasting_model.pkl"
+    )
+
+    if not model_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="Forecasting model not found."
+        )
+
+    model = joblib.load(model_path)
+
+    input_df = pd.DataFrame([{
+        "hour": input_data.hour,
+        "day_of_week": input_data.day_of_week,
+        "day_of_month": input_data.day_of_month,
+        "lag_1": input_data.lag_1,
+        "lag_24": input_data.lag_24,
+        "rolling_6h": input_data.rolling_6h,
+    }])
+
+    prediction = model.predict(input_df)[0]
+
+    return {
+        "status": "success",
+        "predicted_demand_m3h": round(float(prediction), 2),
+        "model": "Random Forest Regressor"
     }
 
 @router.get("/dashboard")
@@ -574,8 +621,7 @@ def repair_validation(dma_id: str):
             if improved
             else "Still Elevated"
         )
-    }
-@router.get("/agent-status")
+    }@router.get("/agent-status")
 def get_agent_status():
     return {
         "workflow_status": "Completed",
@@ -589,6 +635,14 @@ def get_agent_status():
             {
                 "name": "Operations Agent",
                 "status": "Awaiting Human Approval"
+            },
+            {
+                "name": "Dynamic Reassessment Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Post-Repair Validation Agent",
+                "status": "Completed"
             }
         ],
         "human_approval_required": True
@@ -660,4 +714,30 @@ def get_reviewer_results():
     return {
         "status": "success",
         **result
+    }
+@router.get("/agent-status")
+def get_agent_status():
+    return {
+        "workflow_status": "Completed",
+        "agents": [
+            {"name": "Monitoring Agent", "status": "Completed"},
+            {"name": "Demand Forecasting Agent", "status": "Completed"},
+            {"name": "Anomaly Detection Agent", "status": "Completed"},
+            {"name": "Leak Detection Agent", "status": "Completed"},
+            {"name": "Water Balance Agent", "status": "Completed"},
+            {"name": "Maintenance Agent", "status": "Completed"},
+            {
+                "name": "Operations Agent",
+                "status": "Awaiting Human Approval"
+            },
+            {
+                "name": "Dynamic Reassessment Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Post-Repair Validation Agent",
+                "status": "Completed"
+            }
+        ],
+        "human_approval_required": True
     }

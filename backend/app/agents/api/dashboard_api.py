@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Body
 from pathlib import Path
 import pandas as pd
 from fastapi.responses import FileResponse
@@ -202,41 +202,77 @@ def generate_pdf_report():
         media_type="application/pdf",
         filename=report_path.name,
     )
-
-    @router.get("/agent-status")
+@router.get("/agent-status")
 def get_agent_status():
-
     return {
         "workflow_status": "Completed",
         "agents": [
-            {
-                "name": "Monitoring Agent",
-                "status": "Completed"
-            },
-            {
-                "name": "Demand Forecasting Agent",
-                "status": "Completed"
-            },
-            {
-                "name": "Anomaly Detection Agent",
-                "status": "Completed"
-            },
-            {
-                "name": "Leak Detection Agent",
-                "status": "Completed"
-            },
-            {
-                "name": "Water Balance Agent",
-                "status": "Completed"
-            },
-            {
-                "name": "Maintenance Agent",
-                "status": "Completed"
-            },
+            {"name": "Monitoring Agent", "status": "Completed"},
+            {"name": "Demand Forecasting Agent", "status": "Completed"},
+            {"name": "Anomaly Detection Agent", "status": "Completed"},
+            {"name": "Leak Detection Agent", "status": "Completed"},
+            {"name": "Water Balance Agent", "status": "Completed"},
+            {"name": "Maintenance Agent", "status": "Completed"},
             {
                 "name": "Operations Agent",
                 "status": "Awaiting Human Approval"
+            },
+            {
+                "name": "Dynamic Reassessment Agent",
+                "status": "Completed"
+            },
+            {
+                "name": "Post-Repair Validation Agent",
+                "status": "Completed"
             }
         ],
         "human_approval_required": True
+    }
+
+@router.post("/approval")
+def human_approval(
+    action: str = Body(...),
+    approved: bool = Body(...),
+    comments: str = Body("")
+):
+    """
+    Human-in-the-loop approval endpoint.
+    The system records the operator's decision before
+    any operational action is considered.
+    """
+
+    return {
+        "status": "Approval Recorded",
+        "action": action,
+        "approved": approved,
+        "comments": comments,
+        "message": (
+            "Action approved by human operator."
+            if approved
+            else "Action rejected by human operator."
+        ),
+        "physical_action_executed": False
+    }
+
+@router.post("/approval")
+def human_approval(
+    action: str = Body(...),
+    approved: bool = Body(...),
+    comments: str = Body("")
+):
+    """
+    Human-in-the-loop approval endpoint.
+    """
+
+    return {
+        "status": "Approval Recorded",
+        "action": action,
+        "approved": approved,
+        "comments": comments,
+        "message": (
+            "Action approved by human operator."
+            if approved
+            else "Action rejected by human operator."
+        ),
+        "physical_action_executed": False
     }

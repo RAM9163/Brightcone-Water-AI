@@ -1,6 +1,7 @@
 from langgraph.graph import StateGraph, END
 
 from app.agents.state import WaterNetworkState
+from app.agents.post_repair_agent import post_repair_validation_agent
 
 from app.agents.monitoring_agent import monitoring_agent
 from app.agents.forecasting_agent import forecasting_agent
@@ -9,86 +10,41 @@ from app.agents.leak_agent import leak_agent
 from app.agents.water_balance_agent import water_balance_agent
 from app.agents.maintenance_agent import run_maintenance_agent
 from app.agents.operations_agent import run_operations_agent
+from app.agents.reassessment_agent import dynamic_reassessment_agent
 
 
 def build_water_network_workflow():
 
     workflow = StateGraph(WaterNetworkState)
 
-    # Add all seven agents
-    workflow.add_node(
-        "monitoring",
-        monitoring_agent
-    )
+    # Add agents as workflow nodes
+    workflow.add_node("monitoring", monitoring_agent)
+    workflow.add_node("forecasting", forecasting_agent)
+    workflow.add_node("anomaly_detection", anomaly_agent)
+    workflow.add_node("leak_detection", leak_agent)
+    workflow.add_node("water_balance", water_balance_agent)
+    workflow.add_node("maintenance", run_maintenance_agent)
+    workflow.add_node("operations", run_operations_agent)
+    workflow.add_node("reassessment", dynamic_reassessment_agent)
 
     workflow.add_node(
-        "forecasting",
-        forecasting_agent
-    )
-
-    workflow.add_node(
-        "anomaly_detection",
-        anomaly_agent
-    )
-
-    workflow.add_node(
-        "leak_detection",
-        leak_agent
-    )
-
-    workflow.add_node(
-        "water_balance",
-        water_balance_agent
-    )
-
-    workflow.add_node(
-        "maintenance",
-        run_maintenance_agent
-    )
-
-    workflow.add_node(
-        "operations",
-        run_operations_agent
-    )
+    "post_repair_validation",
+    post_repair_validation_agent
+)
 
     # Starting point
     workflow.set_entry_point("monitoring")
 
-    # Connect agents
-    workflow.add_edge(
-        "monitoring",
-        "forecasting"
-    )
-
-    workflow.add_edge(
-        "forecasting",
-        "anomaly_detection"
-    )
-
-    workflow.add_edge(
-        "anomaly_detection",
-        "leak_detection"
-    )
-
-    workflow.add_edge(
-        "leak_detection",
-        "water_balance"
-    )
-
-    workflow.add_edge(
-        "water_balance",
-        "maintenance"
-    )
-
-    workflow.add_edge(
-        "maintenance",
-        "operations"
-    )
-
-    workflow.add_edge(
-        "operations",
-        END
-    )
+    # Sequential workflow
+    workflow.add_edge("monitoring", "forecasting")
+    workflow.add_edge("forecasting", "anomaly_detection")
+    workflow.add_edge("anomaly_detection", "leak_detection")
+    workflow.add_edge("leak_detection", "water_balance")
+    workflow.add_edge("water_balance", "maintenance")
+    workflow.add_edge("maintenance", "operations")
+    workflow.add_edge("operations", "reassessment")
+    workflow.add_edge("reassessment", "post_repair_validation")
+    workflow.add_edge("post_repair_validation", END)
 
     return workflow.compile()
 

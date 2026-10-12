@@ -5,7 +5,12 @@
 body {
   margin: 0;
   font-family:
-    Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
   background: #f4f7fb;
   color: #172033;
 }
@@ -1291,4 +1296,99 @@ tbody tr:hover {
 
 .monitoring-stats .stat-card {
   min-height: 90px;
+}
+/* Forecast input controls */
+.forecast-inputs {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 16px 20px !important;
+  margin-top: 20px;
+}
+
+.forecast-inputs label {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 7px !important;
+  width: 100% !important;
+  margin: 0 !important;
+  font-size: 14px;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.forecast-inputs label span {
+  display: block !important;
+}
+
+.forecast-inputs input {
+  display: block !important;
+  width: 100% !important;
+  height: 40px;
+  box-sizing: border-box;
+  padding: 10px 12px;
+  border: 1px solid #dbe3ee;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f2942;
+  font-size: 14px;
+  outline: none;
+}
+
+.forecast-inputs input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.predict-demand-btn {
+  grid-column: 1 / -1 !important;
+  width: 100% !important;
+  height: 42px;
+  padding: 11px 16px;
+  border: none;
+  border-radius: 8px;
+  background: #123b5d;
+  color: white;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.predict-demand-btn:hover {
+  background: #0d2f4a;
+}
+
+@media (max-width: 700px) {
+  .forecast-inputs {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+.prediction-result {
+  grid-column: 1 / -1;
+  margin-top: 4px;
+  padding: 16px 18px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.prediction-result span {
+  color: #64748b;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.prediction-result strong {
+  color: #123b5d;
+  font-size: 22px;
+}
+
+.prediction-result small {
+  color: #64748b;
+  font-size: 12px;
 }

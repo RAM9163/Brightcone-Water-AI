@@ -2602,6 +2602,18 @@ function OperationsPage() {
       icon: "👷",
       description: "Prepares human-reviewed operational actions",
     },
+
+    {
+      name: "Dynamic Reassessment Agent",
+      icon: "🔄",
+      description:
+        "Reassesses leak confidence using updated sensor information",
+    },
+    {
+      name: "Post-Repair Validation Agent",
+      icon: "✅",
+      description: "Compares before and after repair conditions",
+    },
   ];
   const [data, setData] = useState<Operation[]>([]);
   const [agentStatuses, setAgentStatuses] = useState<Record<string, string>>(

@@ -109,7 +109,7 @@ def test_09_agent_status():
 
     assert result["workflow_status"] == "Completed"
     assert result["human_approval_required"] is True
-    assert len(result["agents"]) == 7
+    assert len(result["agents"]) == 9
 
     agent_names = [agent["name"] for agent in result["agents"]]
 

@@ -39,6 +39,15 @@ export default function Forecasting() {
   const [data, setData] = useState<ForecastResponse | null>(null);
   const [selectedDMA, setSelectedDMA] = useState("DMA-A");
   const [loading, setLoading] = useState(true);
+  const [hour, setHour] = useState("");
+  const [dayOfWeek, setDayOfWeek] = useState("");
+  const [dayOfMonth, setDayOfMonth] = useState("");
+  const [lag1, setLag1] = useState("");
+  const [lag24, setLag24] = useState("");
+  const [rolling6h, setRolling6h] = useState("");
+
+  const [prediction, setPrediction] = useState<number | null>(null);
+  const [predicting, setPredicting] = useState(false);
 
   useEffect(() => {
     axios
@@ -54,12 +63,44 @@ export default function Forecasting() {
       });
   }, []);
 
+  const predictDemand = async () => {
+    if (
+      hour === "" ||
+      dayOfWeek === "" ||
+      dayOfMonth === "" ||
+      lag1 === "" ||
+      lag24 === "" ||
+      rolling6h === ""
+    ) {
+      alert("Please enter all forecast values.");
+      return;
+    }
+
+    try {
+      setPredicting(true);
+
+      const response = await axios.post(`${API_BASE}/api/forecast/predict`, {
+        hour: Number(hour),
+        day_of_week: Number(dayOfWeek),
+        day_of_month: Number(dayOfMonth),
+        lag_1: Number(lag1),
+        lag_24: Number(lag24),
+        rolling_6h: Number(rolling6h),
+      });
+
+      setPrediction(response.data.predicted_demand_m3h);
+    } catch (error) {
+      console.error("Prediction error:", error);
+      alert("Unable to generate prediction.");
+    } finally {
+      setPredicting(false);
+    }
+  };
+
   const dmas = useMemo(() => {
     if (!data) return [];
 
-    return Array.from(
-      new Set(data.records.map((item) => item.dma_id))
-    );
+    return Array.from(new Set(data.records.map((item) => item.dma_id)));
   }, [data]);
 
   const chartData = useMemo(() => {
@@ -102,7 +143,6 @@ export default function Forecasting() {
 
   return (
     <div className="page-container">
-
       {/* HEADER */}
       <div className="page-header">
         <div>
@@ -121,7 +161,6 @@ export default function Forecasting() {
 
       {/* KPI CARDS */}
       <div className="stats-grid">
-
         <div className="stat-card">
           <div className="stat-icon">
             <BrainCircuit size={22} />
@@ -161,12 +200,10 @@ export default function Forecasting() {
             <strong>{dmas.length}</strong>
           </div>
         </div>
-
       </div>
 
       {/* MODEL INFORMATION */}
       <div className="forecast-info-grid">
-
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -177,7 +214,6 @@ export default function Forecasting() {
           </div>
 
           <div className="model-details">
-
             <div className="model-row">
               <span>Algorithm</span>
               <strong>Random Forest Regressor</strong>
@@ -202,10 +238,8 @@ export default function Forecasting() {
               <span>RMSE</span>
               <strong>{data.rmse.toFixed(2)} m³/h</strong>
             </div>
-
           </div>
         </div>
-
         <div className="panel">
           <div className="panel-header">
             <div>
@@ -215,78 +249,159 @@ export default function Forecasting() {
             <BarChart3 size={24} />
           </div>
 
-          <div className="feature-list">
-            <span>Hour of day</span>
-            <span>Day of week</span>
-            <span>Day of month</span>
-            <span>Previous-hour demand</span>
-            <span>24-hour lag demand</span>
-            <span>6-hour rolling demand</span>
+          <div className="feature-list forecast-inputs">
+            <label>
+              <span>Hour of day</span>
+              <input
+                type="number"
+                min="0"
+                max="23"
+                placeholder="14"
+                value={hour}
+                onChange={(e) => setHour(e.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>Day of week</span>
+              <input
+                type="number"
+                min="0"
+                max="6"
+                placeholder="1"
+                value={dayOfWeek}
+                onChange={(e) => setDayOfWeek(e.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>Day of month</span>
+              <input
+                type="number"
+                min="1"
+                max="31"
+                placeholder="12"
+                value={dayOfMonth}
+                onChange={(e) => setDayOfMonth(e.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>Previous-hour demand</span>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="95.5"
+                value={lag1}
+                onChange={(e) => setLag1(e.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>24-hour lag demand</span>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="102.3"
+                value={lag24}
+                onChange={(e) => setLag24(e.target.value)}
+              />
+            </label>
+
+            <label>
+              <span>6-hour rolling demand</span>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="98.7"
+                value={rolling6h}
+                onChange={(e) => setRolling6h(e.target.value)}
+              />
+            </label>
+            <label>
+              <span>6-hour rolling demand</span>
+              <input
+                type="number"
+                step="0.1"
+                placeholder="98.7"
+                value={rolling6h}
+                onChange={(e) => setRolling6h(e.target.value)}
+              />
+            </label>
+
+            <button
+              type="button"
+              className="predict-demand-btn"
+              onClick={predictDemand}
+              disabled={predicting}
+            >
+              {predicting ? "Predicting..." : "Predict Demand"}
+            </button>
+
+            {prediction !== null && (
+              <div className="prediction-result">
+                <span>Predicted Demand</span>
+                <strong>{prediction.toFixed(2)} m³/h</strong>
+                <small>Random Forest Regressor</small>
+              </div>
+            )}
           </div>
         </div>
-
       </div>
 
       {/* DMA SELECTOR */}
       <div className="panel forecast-chart-panel">
+        <div className="panel-header">
+          <div>
+            <h3>Actual vs Forecast Demand</h3>
+            <p>Comparison of observed consumption with AI-predicted demand.</p>
+          </div>
 
-       <div className="panel-header">
-  <div>
-    <h3>Actual vs Forecast Demand</h3>
-    <p>
-      Comparison of observed consumption with AI-predicted demand.
-    </p>
-  </div>
-
-  <select
-    value={selectedDMA}
-    onChange={(e) => setSelectedDMA(e.target.value)}
-    className="dma-select"
-  >
-    {dmas.map((dma) => (
-      <option key={dma} value={dma}>
-        {dma}
-      </option>
-    ))}
-  </select>
-</div>
-<ResponsiveContainer width="100%" height={400}>
-  <LineChart data={chartData}>
-    <CartesianGrid strokeDasharray="3 3" />
-
-    <XAxis dataKey="time" />
-
-    <YAxis />
-
-    <Tooltip />
-
-    <Legend />
-
-    <Line
-      type="monotone"
-      dataKey="actual"
-      name="Actual Demand"
-      stroke="#168ac8"
-      dot={false}
-    />
-
-    <Line
-      type="monotone"
-      dataKey="forecast"
-      name="Forecast Demand"
-      stroke="#e89518"
-      dot={false}
-    />
-  </LineChart>
-</ResponsiveContainer>
-
+          <select
+            value={selectedDMA}
+            onChange={(e) => setSelectedDMA(e.target.value)}
+            className="dma-select"
+          >
+            {dmas.map((dma) => (
+              <option key={dma} value={dma}>
+                {dma}
+              </option>
+            ))}
+          </select>
         </div>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={chartData}>
+            <CartesianGrid strokeDasharray="3 3" />
 
-      
+            <XAxis dataKey="time" />
+
+            <YAxis />
+
+            <Tooltip />
+
+            <Legend />
+
+            <Line
+              type="monotone"
+              dataKey="actual"
+              name="Actual Demand"
+              stroke="#168ac8"
+              dot={false}
+            />
+
+            <Line
+              type="monotone"
+              dataKey="forecast"
+              name="Forecast Demand"
+              stroke="#e89518"
+              dot={false}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
       {/* EXPLANATION */}
       <div className="forecast-explanation">
-
         <div className="explanation-icon">
           <BrainCircuit size={24} />
         </div>
@@ -303,9 +418,7 @@ export default function Forecasting() {
             classified as a leak.
           </p>
         </div>
-
       </div>
-
     </div>
   );
 }

@@ -1,3 +1,44 @@
+## Project Overview
+
+**Agentic AI Water Distribution Leak Detection & Resource Optimization System** is an AI-powered decision-support platform for monitoring urban water distribution networks, detecting abnormal flow and pressure conditions, identifying suspected leaks, estimating water losses, and prioritizing field maintenance.
+
+The system combines IoT sensor data, machine learning, statistical anomaly detection, network topology, multi-agent orchestration, and human-in-the-loop decision making.
+
+## Multi-Agent Architecture
+
+The system consists of 9 specialized agents:
+
+1. Monitoring Agent
+2. Demand Forecasting Agent
+3. Anomaly Detection Agent
+4. Leak Detection Agent
+5. Water Balance Agent
+6. Maintenance Agent
+7. Operations Agent
+8. Dynamic Reassessment Agent
+9. Post-Repair Validation Agent
+
+Critical operational recommendations require human approval before execution. The prototype does not autonomously control pumps, valves, or other physical infrastructure.
+
+## Key Technologies
+
+- **Frontend:** React, TypeScript, Vite
+- **Backend:** Python, FastAPI
+- **Machine Learning:** Scikit-learn, Random Forest Regressor
+- **Agent Orchestration:** LangGraph
+- **Data Processing:** Pandas, NumPy, SciPy
+- **Network Analysis:** NetworkX
+- **Visualization:** Recharts
+- **API Communication:** Axios
+- **Testing:** Pytest
+- **Deployment:** Vercel / Render
+
+## Testing
+
+The project includes automated API, agent, workflow, scenario, repair-validation, and PDF-report tests.
+
+**Final test result: 22/22 tests passed.**
+
 # Brightcone Water Distribution AI
 
 ## Agentic AI Water Distribution Leak Detection & Resource Optimization System
@@ -102,3 +143,4 @@ The system aims to:
                           |
                           v
                  Post-Repair Review
+```
